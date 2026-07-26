@@ -209,7 +209,11 @@
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWl6a3VoeHNvYWFucmV0a3NoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwODA4NjIsImV4cCI6MjEwMDY1Njg2Mn0.bU0R6OJx1Rnoc1xH3hXvpFCpSp55CZZB6-pEWDS6Cm4";
         const API_KEY = "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";
 
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // Безопасная инициализация Supabase
+        let sbClient = null;
+        if (window.supabase && window.supabase.createClient) {
+            sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        }
 
         let isSignUp = false;
         let currentUser = null;
@@ -235,16 +239,19 @@
         }
 
         window.onload = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                currentUser = session.user.email;
-                document.getElementById('authOverlay').style.display = 'none';
-                await initApp();
-            } else {
-                const guestSession = localStorage.getItem('dzhamal_guest');
-                if (guestSession) {
-                    loginAsGuest();
+            if (sbClient) {
+                const { data: { session } } = await sbClient.auth.getSession();
+                if (session) {
+                    currentUser = session.user.email;
+                    document.getElementById('authOverlay').style.display = 'none';
+                    await initApp();
+                    return;
                 }
+            }
+            
+            const guestSession = localStorage.getItem('dzhamal_guest');
+            if (guestSession) {
+                loginAsGuest();
             }
         };
 
@@ -257,7 +264,8 @@
         }
 
         async function loginWithGoogle() {
-            const { error } = await supabase.auth.signInWithOAuth({
+            if (!sbClient) return alert("Подключение к серверу ещё не загрузилось. Попробуйте через секунду!");
+            const { error } = await sbClient.auth.signInWithOAuth({
                 provider: 'google',
                 options: { redirectTo: window.location.href }
             });
@@ -278,9 +286,10 @@
 
             if (!email || !password) return alert('Заполните Email и пароль!');
             if (password.length < 6) return alert('Пароль должен содержать минимум 6 символов!');
+            if (!sbClient) return alert('Ошибка подключения к серверу авторизации!');
 
             if (isSignUp) {
-                const { data, error } = await supabase.auth.signUp({ email, password });
+                const { data, error } = await sbClient.auth.signUp({ email, password });
                 if (error) {
                     alert('Ошибка регистрации: ' + error.message);
                 } else if (data.session) {
@@ -292,7 +301,7 @@
                     toggleAuthMode();
                 }
             } else {
-                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+                const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
                 if (error) alert('Ошибка входа: ' + error.message);
                 else {
                     currentUser = data.user.email;
@@ -304,7 +313,7 @@
 
         async function logout() {
             localStorage.removeItem('dzhamal_guest');
-            await supabase.auth.signOut();
+            if (sbClient) await sbClient.auth.signOut();
             location.reload();
         }
 
@@ -320,8 +329,8 @@
                 if (!chats || chats.length === 0) {
                     await createNewChat();
                 }
-            } else {
-                const { data } = await supabase
+            } else if (sbClient) {
+                const { data } = await sbClient
                     .from('chats')
                     .select('data')
                     .eq('user_email', currentUser);
@@ -356,9 +365,9 @@
                 localStorage.setItem('guest_chats', JSON.stringify(chats));
                 return;
             }
-            if (!currentUser) return;
+            if (!currentUser || !sbClient) return;
             for (const chat of chats) {
-                await supabase.from('chats').upsert({
+                await sbClient.from('chats').upsert({
                     id: chat.id,
                     user_email: currentUser,
                     data: chat,

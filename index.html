@@ -33,7 +33,7 @@
         .header { padding: 16px 20px; background: #0f172a; border-bottom: 1px solid #334155; font-weight: bold; font-size: 18px; color: #818cf8; }
         .messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
         .msg { max-width: 75%; padding: 12px 16px; border-radius: 12px; font-size: 15px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
-        .msg img { max-width: 100%; border-radius: 8px; margin-top: 8px; display: block; }
+        .msg img { max-width: 100%; max-height: 300px; border-radius: 8px; margin-top: 8px; display: block; }
         .user { background: #6366f1; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
         .bot { background: #1e293b; color: #e2e8f0; align-self: flex-start; border-bottom-left-radius: 2px; border: 1px solid #334155; }
 
@@ -45,7 +45,7 @@
         .input-box { display: flex; gap: 10px; align-items: center; }
         input[type="text"] { flex: 1; padding: 12px 16px; border-radius: 8px; border: 1px solid #334155; background: #1e293b; color: white; outline: none; font-size: 15px; }
         input[type="text"]:focus { border-color: #6366f1; }
-        .file-btn { background: #334155; padding: 12px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .file-btn { background: #334155; padding: 12px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; font-size: 16px; }
         .file-btn:hover { background: #475569; }
         .send-btn { padding: 12px 24px; background: #6366f1; border: none; color: white; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; }
         .send-btn:hover { background: #4f46e5; }
@@ -162,7 +162,11 @@
         }
 
         function createNewChat() {
-            const newChat = { id: 'chat_' + Date.now(), title: 'Новый диалог', messages: [{ role: 'assistant', content: 'Салам! Я Dzhamal AI. Могу отвечать на текстовые вопросы и распознавать картинки!' }] };
+            const newChat = { 
+                id: 'chat_' + Date.now(), 
+                title: 'Новый диалог', 
+                messages: [{ role: 'assistant', content: 'Салам! Я Dzhamal AI. Могу отвечать на вопросы и распознавать фото!' }] 
+            };
             chats.unshift(newChat);
             currentChatId = newChat.id;
             save();
@@ -201,7 +205,9 @@
                     div.textContent = m.content;
                 } else if (Array.isArray(m.content)) {
                     m.content.forEach(part => {
-                        if (part.type === 'text') div.appendChild(document.createTextNode(part.text));
+                        if (part.type === 'text' && part.text) {
+                            div.appendChild(document.createTextNode(part.text));
+                        }
                         if (part.type === 'image_url') {
                             const img = document.createElement('img');
                             img.src = part.image_url.url;
@@ -245,18 +251,21 @@
 
             let userContent;
             if (base64Image) {
-                userContent = [];
-                if (text) userContent.push({ type: "text", text: text });
-                userContent.push({ type: "image_url", image_url: { url: base64Image } });
+                userContent = [
+                    { type: "text", text: text || "Что изображено на этом фото?" },
+                    { type: "image_url", image_url: { url: base64Image } }
+                ];
             } else {
                 userContent = text;
             }
 
             chat.messages.push({ role: 'user', content: userContent });
             
+            const hasImage = !!base64Image;
+            const currentImg = base64Image;
+
             // Очищаем вводы
             input.value = '';
-            const imgToSend = base64Image;
             removeImage();
 
             save();
@@ -272,8 +281,32 @@
             box.scrollTop = box.scrollHeight;
 
             try {
-                // Если с картиной — используем Мультимодальную модель Vision
-                const modelName = imgToSend ? "llama-3.2-11b-vision-preview" : "llama-3.3-70b-versatile";
+                let apiMessages;
+                let modelName;
+
+                if (hasImage) {
+                    modelName = "llama-3.2-11b-vision-preview";
+                    apiMessages = [
+                        { role: "system", content: "Ты — Dzhamal AI. Твоего создателя зовут Джамал. Подробно опиши фото и ответь на вопрос пользователя." },
+                        { role: "user", content: [
+                            { type: "text", text: text || "Что изображено на этом фото?" },
+                            { type: "image_url", image_url: { url: currentImg } }
+                        ]}
+                    ];
+                } else {
+                    modelName = "llama-3.3-70b-versatile";
+                    const cleanHistory = chat.messages.map(m => {
+                        if (Array.isArray(m.content)) {
+                            const textPart = m.content.find(p => p.type === 'text');
+                            return { role: m.role, content: textPart ? textPart.text : "Фотография" };
+                        }
+                        return m;
+                    });
+                    apiMessages = [
+                        { role: "system", content: "Ты — Dzhamal AI. Твоего создателя зовут Джамал. Отвечай подробно и помогай во всем." },
+                        ...cleanHistory
+                    ];
+                }
 
                 const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
                     method: "POST",
@@ -283,23 +316,22 @@
                     },
                     body: JSON.stringify({
                         model: modelName,
-                        messages: [
-                            { role: "system", content: "Ты — Dzhamal AI. Твоего создателя зовут Джамал. Отвечай подробно и помогай во всем." },
-                            ...chat.messages
-                        ]
+                        messages: apiMessages
                     })
                 });
 
                 const data = await res.json();
-                box.removeChild(loadingDiv);
+                if (box.contains(loadingDiv)) box.removeChild(loadingDiv);
 
                 if (data.choices && data.choices[0]) {
                     const reply = data.choices[0].message.content;
                     chat.messages.push({ role: 'assistant', content: reply });
                 } else {
-                    chat.messages.push({ role: 'assistant', content: 'Ошибка при анализе.' });
+                    console.error("Ошибка API:", data);
+                    chat.messages.push({ role: 'assistant', content: 'Ошибка при анализе (возможно фото слишком большого размера).' });
                 }
             } catch (e) {
+                console.error("Ошибка сети:", e);
                 if (box.contains(loadingDiv)) box.removeChild(loadingDiv);
                 chat.messages.push({ role: 'assistant', content: 'Ошибка соединения с сервером.' });
             }

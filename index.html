@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dzhamal AI</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+        body { background: #0f172a; color: white; display: flex; height: 100vh; }
+        .sidebar { width: 260px; background: #1e293b; padding: 15px; display: flex; flex-direction: column; gap: 10px; border-right: 1px solid #334155; }
+        .new-btn { background: #6366f1; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s; }
+        .new-btn:hover { background: #4f46e5; }
+        .chat-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+        .chat-item { padding: 10px 12px; background: #334155; border-radius: 6px; cursor: pointer; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .chat-item:hover { background: #475569; }
+        .main { flex: 1; display: flex; flex-direction: column; }
+        .header { padding: 16px 20px; background: #0f172a; border-bottom: 1px solid #334155; font-weight: bold; font-size: 18px; color: #818cf8; }
+        .messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+        .msg { max-width: 75%; padding: 12px 16px; border-radius: 12px; font-size: 15px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+        .user { background: #6366f1; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .bot { background: #1e293b; color: #e2e8f0; align-self: flex-start; border-bottom-left-radius: 2px; border: 1px solid #334155; }
+        .input-box { padding: 16px 20px; background: #0f172a; display: flex; gap: 10px; border-top: 1px solid #334155; }
+        input { flex: 1; padding: 12px 16px; border-radius: 8px; border: 1px solid #334155; background: #1e293b; color: white; outline: none; font-size: 15px; }
+        input:focus { border-color: #6366f1; }
+        button.send-btn { padding: 12px 24px; background: #6366f1; border: none; color: white; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; }
+        button.send-btn:hover { background: #4f46e5; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <button class="new-btn" onclick="createNewChat()">+ Новый чат</button>
+        <div class="chat-list" id="chatList"></div>
+    </div>
+    <div class="main">
+        <div class="header">Dzhamal AI ⚡</div>
+        <div class="messages" id="messages"></div>
+        <div class="input-box">
+            <input type="text" id="userInput" placeholder="Напиши сообщение..." onkeydown="if(event.key==='Enter') sendMessage()">
+            <button class="send-btn" onclick="sendMessage()">Отправить</button>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = "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";
+        let chats = JSON.parse(localStorage.getItem('dzhamal_chats')) || [];
+        let currentChatId = localStorage.getItem('dzhamal_active_chat') || null;
+
+        window.onload = () => {
+            if (chats.length === 0) createNewChat();
+            else {
+                if (!currentChatId || !chats.find(c => c.id === currentChatId)) currentChatId = chats[0].id;
+                renderSidebar();
+                loadMessages();
+            }
+        };
+
+        function createNewChat() {
+            const newChat = { id: 'chat_' + Date.now(), title: 'Новый диалог', messages: [{ role: 'assistant', content: 'Салам! Я Dzhamal AI. Чем могу помочь?' }] };
+            chats.unshift(newChat);
+            currentChatId = newChat.id;
+            save();
+            renderSidebar();
+            loadMessages();
+        }
+
+        function save() {
+            localStorage.setItem('dzhamal_chats', JSON.stringify(chats));
+            localStorage.setItem('dzhamal_active_chat', currentChatId);
+        }
+
+        function renderSidebar() {
+            const list = document.getElementById('chatList');
+            list.innerHTML = '';
+            chats.forEach(c => {
+                const item = document.createElement('div');
+                item.className = 'chat-item';
+                item.textContent = c.title;
+                item.onclick = () => { currentChatId = c.id; save(); renderSidebar(); loadMessages(); };
+                list.appendChild(item);
+            });
+        }
+
+        function loadMessages() {
+            const box = document.getElementById('messages');
+            box.innerHTML = '';
+            const chat = chats.find(c => c.id === currentChatId);
+            if (!chat) return;
+            chat.messages.forEach(m => {
+                const div = document.createElement('div');
+                div.className = `msg ${m.role === 'user' ? 'user' : 'bot'}`;
+                div.textContent = m.content;
+                box.appendChild(div);
+            });
+            box.scrollTop = box.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('userInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const chat = chats.find(c => c.id === currentChatId);
+            if (chat.messages.length <= 1) chat.title = text.substring(0, 18) + '...';
+
+            chat.messages.push({ role: 'user', content: text });
+            input.value = '';
+            save();
+            renderSidebar();
+            loadMessages();
+
+            // Создаем временную плашку ожидания
+            const box = document.getElementById('messages');
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'msg bot';
+            loadingDiv.textContent = 'Печатает...';
+            box.appendChild(loadingDiv);
+            box.scrollTop = box.scrollHeight;
+
+            try {
+                const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${API_KEY}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        model: "llama-3.3-70b-versatile",
+                        messages: [
+                            { role: "system", content: "Ты — Dzhamal AI. Твоего создателя зовут Джамал. Отвечай уверенно, дружелюбно и помогай во всем." },
+                            ...chat.messages
+                        ]
+                    })
+                });
+
+                const data = await res.json();
+                box.removeChild(loadingDiv);
+
+                if (data.choices && data.choices[0]) {
+                    const reply = data.choices[0].message.content;
+                    chat.messages.push({ role: 'assistant', content: reply });
+                } else {
+                    chat.messages.push({ role: 'assistant', content: 'Ошибка при получении ответа от ИИ.' });
+                }
+            } catch (e) {
+                box.removeChild(loadingDiv);
+                chat.messages.push({ role: 'assistant', content: 'Ошибка соединения с сетью.' });
+            }
+            save();
+            loadMessages();
+        }
+    </script>
+</body>
+</html>

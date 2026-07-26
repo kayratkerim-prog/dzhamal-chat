@@ -209,6 +209,9 @@
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWl6a3VoeHNvYWFucmV0a3NoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwODA4NjIsImV4cCI6MjEwMDY1Njg2Mn0.bU0R6OJx1Rnoc1xH3hXvpFCpSp55CZZB6-pEWDS6Cm4";
         const API_KEY = "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";
 
+        // Системный промпт
+        const SYSTEM_PROMPT = "Ты — искусственный интеллект Dzhamal AI. Твоим создателем и разработчиком является Керім Қайрат из студии SaniDev Studio. Когда тебя спрашивают, кто тебя создал или кто твой разработчик, ты всегда четко и гордо отвечаешь, что тебя создал Керім Қайрат (студия SaniDev Studio).";
+
         // Безопасная инициализация Supabase
         let sbClient = null;
         if (window.supabase && window.supabase.createClient) {
@@ -480,7 +483,7 @@
                 if (hasImage) {
                     modelName = "llama-3.2-11b-vision-preview";
                     apiMessages = [
-                        { role: "system", content: "Ты — Dzhamal AI. Твоего создателя зовут Джамал." },
+                        { role: "system", content: SYSTEM_PROMPT },
                         { role: "user", content: [
                             { type: "text", text: text || "Что изображено на этом фото?" },
                             { type: "image_url", image_url: { url: currentImg } }
@@ -496,7 +499,7 @@
                         return m;
                     });
                     apiMessages = [
-                        { role: "system", content: "Ты — Dzhamal AI. Твоего создателя зовут Джамал." },
+                        { role: "system", content: SYSTEM_PROMPT },
                         ...cleanHistory
                     ];
                 }

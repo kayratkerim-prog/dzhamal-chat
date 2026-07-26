@@ -2,104 +2,67 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Dzhamal AI</title>
+    <!-- Подключаем Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
-        body { background: #0f172a; color: white; display: flex; height: 100vh; overflow: hidden; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background: #131314; color: #e3e3e3; display: flex; height: 100vh; overflow: hidden; }
 
         /* Окно Авторизации */
-        #authOverlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.95); display: flex; align-items: center; justify-content: center; z-index: 100; }
-        .auth-card { background: #1e293b; border: 1px solid #334155; padding: 30px; border-radius: 16px; width: 320px; display: flex; flex-direction: column; gap: 14px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        .auth-card h2 { color: #818cf8; font-size: 22px; margin-bottom: 5px; }
-        .auth-card input { padding: 12px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: white; outline: none; }
-        .auth-card input:focus { border-color: #6366f1; }
-        .auth-card button { padding: 12px; background: #6366f1; border: none; color: white; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        .auth-card button:hover { background: #4f46e5; }
-        .auth-toggle { font-size: 13px; color: #94a3b8; cursor: pointer; }
-        .auth-toggle span { color: #818cf8; text-decoration: underline; }
+        #authOverlay { position: fixed; inset: 0; background: rgba(19, 19, 20, 0.95); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+        .auth-card { background: #1e1f20; border: 1px solid #444746; padding: 30px; border-radius: 20px; width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 16px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .auth-card h2 { color: #a8c7fa; font-size: 22px; }
+        .auth-card input { padding: 14px; background: #131314; border: 1px solid #444746; border-radius: 10px; color: white; outline: none; font-size: 15px; }
+        .auth-card input:focus { border-color: #a8c7fa; }
+        .auth-card button { padding: 14px; background: #a8c7fa; border: none; color: #040e25; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 15px; transition: 0.2s; }
+        .auth-card button:hover { background: #7cacf8; }
+        .auth-toggle { font-size: 13px; color: #c4c7c5; cursor: pointer; }
+        .auth-toggle span { color: #a8c7fa; text-decoration: underline; }
 
-        /* Боковое меню (Sidebar Gemini style) */
-        .sidebar { 
-            width: 260px; 
-            background: #1e293b; 
-            padding: 15px; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 10px; 
-            border-right: 1px solid #334155; 
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            white-space: nowrap;
-            overflow: hidden;
-            z-index: 10;
-        }
+        .sidebar-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 90; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+        .sidebar-overlay.active { opacity: 1; pointer-events: auto; }
 
-        /* Класс скрытого меню */
-        .sidebar.collapsed { 
-            width: 0; 
-            padding-left: 0; 
-            padding-right: 0; 
-            border-right-color: transparent; 
-            opacity: 0;
-            pointer-events: none;
-        }
+        /* Боковое меню Gemini Style */
+        .sidebar { width: 280px; background: #1e1f20; padding: 16px; display: flex; flex-direction: column; gap: 12px; border-right: 1px solid #282a2c; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); white-space: nowrap; z-index: 100; height: 100vh; }
+        .new-btn { background: #131314; color: #e3e3e3; border: 1px solid #444746; padding: 12px 16px; border-radius: 30px; cursor: pointer; font-weight: 500; font-size: 14px; text-align: left; display: flex; align-items: center; gap: 10px; transition: 0.2s; }
+        .new-btn:hover { background: #282a2c; }
 
-        .user-info { font-size: 13px; color: #94a3b8; padding: 8px; background: #0f172a; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
-        .logout-btn { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 12px; font-weight: bold; }
-        .new-btn { background: #6366f1; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; text-align: left; }
-        .new-btn:hover { background: #4f46e5; }
-        .chat-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
-        .chat-item { padding: 10px 12px; background: #334155; border-radius: 6px; cursor: pointer; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .chat-item:hover { background: #475569; }
+        .chat-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+        .chat-item { padding: 10px 14px; background: transparent; border-radius: 20px; cursor: pointer; font-size: 14px; color: #c4c7c5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: 0.2s; }
+        .chat-item:hover, .chat-item.active { background: #004a77; color: #c2e7ff; }
 
-        /* Главная область */
-        .main { flex: 1; display: flex; flex-direction: column; width: 100%; }
-        
-        /* Шапка с кнопкой меню */
-        .header { 
-            padding: 12px 20px; 
-            background: #0f172a; 
-            border-bottom: 1px solid #334155; 
-            display: flex; 
-            align-items: center; 
-            gap: 15px; 
-        }
-        
-        .toggle-btn { 
-            background: transparent; 
-            border: none; 
-            color: #94a3b8; 
-            font-size: 20px; 
-            cursor: pointer; 
-            padding: 6px 10px; 
-            border-radius: 8px; 
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: 0.2s;
-        }
-        .toggle-btn:hover { background: #1e293b; color: white; }
+        .user-info { font-size: 13px; color: #c4c7c5; padding: 12px; background: #131314; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #282a2c; }
+        .logout-btn { background: none; border: none; color: #f2b8b5; cursor: pointer; font-size: 12px; font-weight: bold; }
 
-        .header-title { font-weight: bold; font-size: 18px; color: #818cf8; }
+        .main { flex: 1; display: flex; flex-direction: column; width: 100%; height: 100vh; background: #131314; }
+        .header { padding: 12px 16px; display: flex; align-items: center; gap: 12px; }
+        .toggle-btn { background: transparent; border: none; color: #c4c7c5; font-size: 22px; cursor: pointer; padding: 8px; border-radius: 50%; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; transition: 0.2s; }
+        .toggle-btn:hover { background: #282a2c; color: white; }
+        .header-title { font-weight: 500; font-size: 18px; color: #e3e3e3; }
 
-        .messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
-        .msg { max-width: 75%; padding: 12px 16px; border-radius: 12px; font-size: 15px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
-        .msg img { max-width: 100%; max-height: 300px; border-radius: 8px; margin-top: 8px; display: block; }
-        .user { background: #6366f1; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
-        .bot { background: #1e293b; color: #e2e8f0; align-self: flex-start; border-bottom-left-radius: 2px; border: 1px solid #334155; }
+        .messages { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; max-width: 800px; width: 100%; margin: 0 auto; }
+        .msg { max-width: 85%; padding: 14px 18px; border-radius: 18px; font-size: 15px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+        .msg img { max-width: 100%; max-height: 300px; border-radius: 12px; margin-top: 8px; display: block; }
+        .user { background: #282a2c; color: #e3e3e3; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .bot { background: transparent; color: #e3e3e3; align-self: flex-start; padding-left: 0; }
 
-        .input-container { padding: 16px 20px; background: #0f172a; border-top: 1px solid #334155; display: flex; flex-direction: column; gap: 8px; }
-        .preview-box { display: none; align-items: center; gap: 10px; background: #1e293b; padding: 6px 12px; border-radius: 8px; width: fit-content; }
-        .preview-box img { height: 40px; border-radius: 4px; }
-        .preview-box span { color: #ef4444; cursor: pointer; font-weight: bold; }
+        .input-container { padding: 12px 16px 20px; max-width: 800px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
+        .preview-box { display: none; align-items: center; gap: 10px; background: #1e1f20; padding: 6px 12px; border-radius: 12px; width: fit-content; border: 1px solid #444746; }
+        .preview-box img { height: 44px; border-radius: 6px; }
+        .preview-box span { color: #f2b8b5; cursor: pointer; font-weight: bold; padding: 4px; }
 
-        .input-box { display: flex; gap: 10px; align-items: center; }
-        input[type="text"] { flex: 1; padding: 12px 16px; border-radius: 8px; border: 1px solid #334155; background: #1e293b; color: white; outline: none; font-size: 15px; }
-        input[type="text"]:focus { border-color: #6366f1; }
-        .file-btn { background: #334155; padding: 12px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; font-size: 16px; }
-        .file-btn:hover { background: #475569; }
-        .send-btn { padding: 12px 24px; background: #6366f1; border: none; color: white; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; }
-        .send-btn:hover { background: #4f46e5; }
+        .input-box { display: flex; gap: 8px; align-items: center; background: #1e1f20; border: 1px solid #444746; border-radius: 28px; padding: 6px 12px 6px 16px; }
+        .input-box:focus-within { border-color: #a8c7fa; }
+        input[type="text"] { flex: 1; border: none; background: transparent; color: white; outline: none; font-size: 15px; padding: 8px 0; }
+        .file-btn { background: transparent; border: none; color: #c4c7c5; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; padding: 8px; border-radius: 50%; transition: 0.2s; }
+        .file-btn:hover { background: #282a2c; color: white; }
+        .send-btn { background: #a8c7fa; border: none; color: #040e25; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; font-weight: bold; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: 0.2s; flex-shrink: 0; }
+        .send-btn:hover { background: #7cacf8; }
+
+        @media (min-width: 769px) { .sidebar.collapsed { margin-left: -280px; } }
+        @media (max-width: 768px) { .sidebar { position: fixed; top: 0; left: 0; transform: translateX(-100%); } .sidebar.open { transform: translateX(0); } }
     </style>
 </head>
 <body>
@@ -107,8 +70,8 @@
     <!-- Окно логина/регистрации -->
     <div id="authOverlay">
         <div class="auth-card">
-            <h2 id="authTitle">Вход в Dzhamal AI</h2>
-            <input type="email" id="authEmail" placeholder="Email">
+            <h2 id="authTitle">Dzhamal AI</h2>
+            <input type="email" id="authEmail" placeholder="Email" autocomplete="off">
             <input type="password" id="authPass" placeholder="Пароль">
             <button onclick="handleAuth()" id="authBtn">Войти</button>
             <div class="auth-toggle" onclick="toggleAuthMode()">
@@ -117,20 +80,25 @@
         </div>
     </div>
 
+    <!-- Затенение для мобильного меню -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
     <!-- Главный интерфейс -->
     <div class="sidebar" id="sidebar">
+        <button class="new-btn" onclick="createNewChat(); closeSidebar();">
+            <span>+</span> Новый диалог
+        </button>
+        <div class="chat-list" id="chatList"></div>
         <div class="user-info">
-            <span id="userEmailDisplay">user@mail.com</span>
+            <span id="userEmailDisplay" style="overflow:hidden; text-overflow:ellipsis;">user@mail.com</span>
             <button class="logout-btn" onclick="logout()">Выход</button>
         </div>
-        <button class="new-btn" onclick="createNewChat()">+ Новый чат</button>
-        <div class="chat-list" id="chatList"></div>
     </div>
 
     <div class="main">
         <div class="header">
-            <button class="toggle-btn" onclick="toggleSidebar()" title="Свернуть/Развернуть меню">☰</button>
-            <div class="header-title">Dzhamal AI ⚡</div>
+            <button class="toggle-btn" onclick="toggleSidebar()" title="Меню">☰</button>
+            <div class="header-title">Dzhamal AI</div>
         </div>
         <div class="messages" id="messages"></div>
         
@@ -144,99 +112,129 @@
                     📷
                     <input type="file" id="fileInput" accept="image/*" style="display: none;" onchange="handleFileSelect(event)">
                 </label>
-                <input type="text" id="userInput" placeholder="Напиши сообщение..." onkeydown="if(event.key==='Enter') sendMessage()">
-                <button class="send-btn" onclick="sendMessage()">Отправить</button>
+                <input type="text" id="userInput" placeholder="Спросите Dzhamal AI..." onkeydown="if(event.key==='Enter') sendMessage()">
+                <button class="send-btn" onclick="sendMessage()">➔</button>
             </div>
         </div>
     </div>
 
     <script>
+        // ДАННЫЕ SUPABASE ПОДКЛЮЧЕНИЯ
+        const SUPABASE_URL = "https://wjuizkuhxoaanretksh.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWl6a3VoeHNvYWFucmV0a3NoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwODA4NjIsImV4cCI6MjEwMDY1Njg2Mn0.bU0R6OJx1Rnoc1xH3hXvpFCpSp55CZZB6-pEWDS6Cm4";
+        
         const API_KEY = "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";
-        let isSignUp = false;
-        let currentUser = localStorage.getItem('dzhamal_current_user') || null;
-        let base64Image = null;
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+        let isSignUp = false;
+        let currentUser = null;
+        let base64Image = null;
         let chats = [];
         let currentChatId = null;
 
-        // --- ПЕРЕКЛЮЧЕНИЕ СИДЕБАРА ---
+        // --- УПРАВЛЕНИЕ МЕНЮ ---
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
-            sidebar.classList.toggle('collapsed');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (window.innerWidth <= 768) {
+                sidebar.classList.toggle('open');
+                overlay.classList.toggle('active');
+            } else {
+                sidebar.classList.toggle('collapsed');
+            }
         }
 
-        // --- АВТОРИЗАЦИЯ ---
-        window.onload = () => {
-            if (currentUser) {
+        function closeSidebar() {
+            document.getElementById('sidebar').classList.remove('open');
+            document.getElementById('sidebarOverlay').classList.remove('active');
+        }
+
+        // --- ИНИЦИАЛИЗАЦИЯ И АВТОРИЗАЦИЯ ---
+        window.onload = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                currentUser = session.user.email;
                 document.getElementById('authOverlay').style.display = 'none';
-                initApp();
+                await initApp();
             }
         };
 
         function toggleAuthMode() {
             isSignUp = !isSignUp;
-            document.getElementById('authTitle').textContent = isSignUp ? 'Регистрация' : 'Вход в Dzhamal AI';
+            document.getElementById('authTitle').textContent = isSignUp ? 'Регистрация' : 'Dzhamal AI';
             document.getElementById('authBtn').textContent = isSignUp ? 'Создать аккаунт' : 'Войти';
             document.getElementById('authToggleText').textContent = isSignUp ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Зарегистрироваться';
         }
 
-        function handleAuth() {
-            const email = document.getElementById('authEmail').value.trim();
-            const pass = document.getElementById('authPass').value.trim();
-            if (!email || !pass) return alert('Заполните Email и пароль!');
+        async function handleAuth() {
+            const email = document.getElementById('authEmail').value.trim().toLowerCase();
+            const password = document.getElementById('authPass').value.trim();
 
-            let users = JSON.parse(localStorage.getItem('dzhamal_users')) || {};
+            if (!email || !password) return alert('Заполните Email и пароль!');
 
             if (isSignUp) {
-                if (users[email]) return alert('Пользователь с таким Email уже существует!');
-                users[email] = pass;
-                localStorage.setItem('dzhamal_users', JSON.stringify(users));
-                alert('Регистрация успешна!');
+                const { error } = await supabase.auth.signUp({ email, password });
+                if (error) alert('Ошибка регистрации: ' + error.message);
+                else alert('Регистрация прошла успешно! Теперь войдите в аккаунт.');
             } else {
-                if (!users[email] || users[email] !== pass) return alert('Неверный Email или пароль!');
+                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) alert('Ошибка входа: ' + error.message);
+                else {
+                    currentUser = data.user.email;
+                    document.getElementById('authOverlay').style.display = 'none';
+                    await initApp();
+                }
             }
-
-            currentUser = email;
-            localStorage.setItem('dzhamal_current_user', currentUser);
-            document.getElementById('authOverlay').style.display = 'none';
-            initApp();
         }
 
-        function logout() {
-            localStorage.removeItem('dzhamal_current_user');
+        async function logout() {
+            await supabase.auth.signOut();
             location.reload();
         }
 
-        // --- ЧАТЫ И ЛОГИКА ---
-        function initApp() {
+        // --- ЧАТЫ И БД ---
+        async function initApp() {
             document.getElementById('userEmailDisplay').textContent = currentUser;
-            chats = JSON.parse(localStorage.getItem(`dzhamal_chats_${currentUser}`)) || [];
-            currentChatId = localStorage.getItem(`dzhamal_active_${currentUser}`) || null;
+            
+            const { data, error } = await supabase
+                .from('chats')
+                .select('data')
+                .eq('user_email', currentUser);
 
-            if (chats.length === 0) createNewChat();
-            else {
-                if (!currentChatId || !chats.find(c => c.id === currentChatId)) currentChatId = chats[0].id;
-                renderSidebar();
-                loadMessages();
+            if (data && data.length > 0) {
+                chats = data.map(item => item.data);
+                currentChatId = chats[0].id;
+            } else {
+                await createNewChat();
             }
-        }
-
-        function createNewChat() {
-            const newChat = { 
-                id: 'chat_' + Date.now(), 
-                title: 'Новый диалог', 
-                messages: [{ role: 'assistant', content: 'Салам! Я Dzhamal AI. Могу отвечать на вопросы и распознавать фото!' }] 
-            };
-            chats.unshift(newChat);
-            currentChatId = newChat.id;
-            save();
+            
             renderSidebar();
             loadMessages();
         }
 
-        function save() {
-            localStorage.setItem(`dzhamal_chats_${currentUser}`, JSON.stringify(chats));
-            localStorage.setItem(`dzhamal_active_${currentUser}`, currentChatId);
+        async function createNewChat() {
+            const newChat = { 
+                id: 'chat_' + Date.now(), 
+                title: 'Новый диалог', 
+                messages: [{ role: 'assistant', content: 'Привет! Я Dzhamal AI. Чем могу помочь?' }] 
+            };
+            chats.unshift(newChat);
+            currentChatId = newChat.id;
+            await saveToDatabase();
+            renderSidebar();
+            loadMessages();
+        }
+
+        async function saveToDatabase() {
+            if (!currentUser) return;
+            for (const chat of chats) {
+                await supabase.from('chats').upsert({
+                    id: chat.id,
+                    user_email: currentUser,
+                    data: chat,
+                    updated_at: new Date()
+                });
+            }
         }
 
         function renderSidebar() {
@@ -244,9 +242,14 @@
             list.innerHTML = '';
             chats.forEach(c => {
                 const item = document.createElement('div');
-                item.className = 'chat-item';
+                item.className = `chat-item ${c.id === currentChatId ? 'active' : ''}`;
                 item.textContent = c.title;
-                item.onclick = () => { currentChatId = c.id; save(); renderSidebar(); loadMessages(); };
+                item.onclick = () => { 
+                    currentChatId = c.id; 
+                    renderSidebar(); 
+                    loadMessages(); 
+                    closeSidebar();
+                };
                 list.appendChild(item);
             });
         }
@@ -300,7 +303,7 @@
             document.getElementById('previewBox').style.display = 'none';
         }
 
-        // --- ОТПРАВКА СООБЩЕНИЙ ---
+        // --- ОТПРАВКА СООБЩЕНИЙ В GROQ ---
         async function sendMessage() {
             const input = document.getElementById('userInput');
             const text = input.value.trim();
@@ -309,34 +312,27 @@
             const chat = chats.find(c => c.id === currentChatId);
             if (chat.messages.length <= 1) chat.title = (text || 'Фотография').substring(0, 18) + '...';
 
-            let userContent;
-            if (base64Image) {
-                userContent = [
-                    { type: "text", text: text || "Что изображено на этом фото?" },
-                    { type: "image_url", image_url: { url: base64Image } }
-                ];
-            } else {
-                userContent = text;
-            }
+            let userContent = base64Image ? [
+                { type: "text", text: text || "Что изображено на этом фото?" },
+                { type: "image_url", image_url: { url: base64Image } }
+            ] : text;
 
             chat.messages.push({ role: 'user', content: userContent });
             
             const hasImage = !!base64Image;
             const currentImg = base64Image;
 
-            // Очищаем вводы
             input.value = '';
             removeImage();
 
-            save();
             renderSidebar();
             loadMessages();
+            await saveToDatabase();
 
-            // Индикатор ожидания
             const box = document.getElementById('messages');
             const loadingDiv = document.createElement('div');
             loadingDiv.className = 'msg bot';
-            loadingDiv.textContent = 'Dzhamal AI думает...';
+            loadingDiv.textContent = 'Думаю...';
             box.appendChild(loadingDiv);
             box.scrollTop = box.scrollHeight;
 
@@ -347,7 +343,7 @@
                 if (hasImage) {
                     modelName = "llama-3.2-11b-vision-preview";
                     apiMessages = [
-                        { role: "system", content: "Ты — Dzhamal AI. Твоего создателя зовут Джамал. Подробно опиши фото и ответь на вопрос пользователя." },
+                        { role: "system", content: "Ты — Dzhamal AI. Твоего создателя зовут Джамал." },
                         { role: "user", content: [
                             { type: "text", text: text || "Что изображено на этом фото?" },
                             { type: "image_url", image_url: { url: currentImg } }
@@ -363,7 +359,7 @@
                         return m;
                     });
                     apiMessages = [
-                        { role: "system", content: "Ты — Dzhamal AI. Твоего создателя зовут Джамал. Отвечай подробно и помогай во всем." },
+                        { role: "system", content: "Ты — Dzhamal AI. Твоего создателя зовут Джамал." },
                         ...cleanHistory
                     ];
                 }
@@ -374,29 +370,23 @@
                         "Authorization": `Bearer ${API_KEY}`,
                         "Content-Type": "application/json"
                     },
-                    body: JSON.stringify({
-                        model: modelName,
-                        messages: apiMessages
-                    })
+                    body: JSON.stringify({ model: modelName, messages: apiMessages })
                 });
 
                 const data = await res.json();
                 if (box.contains(loadingDiv)) box.removeChild(loadingDiv);
 
                 if (data.choices && data.choices[0]) {
-                    const reply = data.choices[0].message.content;
-                    chat.messages.push({ role: 'assistant', content: reply });
+                    chat.messages.push({ role: 'assistant', content: data.choices[0].message.content });
                 } else {
-                    console.error("Ошибка API:", data);
-                    chat.messages.push({ role: 'assistant', content: 'Ошибка при анализе (возможно фото слишком большого размера).' });
+                    chat.messages.push({ role: 'assistant', content: 'Ошибка при получении ответа.' });
                 }
             } catch (e) {
-                console.error("Ошибка сети:", e);
                 if (box.contains(loadingDiv)) box.removeChild(loadingDiv);
                 chat.messages.push({ role: 'assistant', content: 'Ошибка соединения с сервером.' });
             }
 
-            save();
+            await saveToDatabase();
             loadMessages();
         }
     </script>

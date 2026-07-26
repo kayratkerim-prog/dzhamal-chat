@@ -19,18 +19,69 @@
         .auth-toggle { font-size: 13px; color: #94a3b8; cursor: pointer; }
         .auth-toggle span { color: #818cf8; text-decoration: underline; }
 
-        /* Чат */
-        .sidebar { width: 260px; background: #1e293b; padding: 15px; display: flex; flex-direction: column; gap: 10px; border-right: 1px solid #334155; }
+        /* Боковое меню (Sidebar Gemini style) */
+        .sidebar { 
+            width: 260px; 
+            background: #1e293b; 
+            padding: 15px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 10px; 
+            border-right: 1px solid #334155; 
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            white-space: nowrap;
+            overflow: hidden;
+            z-index: 10;
+        }
+
+        /* Класс скрытого меню */
+        .sidebar.collapsed { 
+            width: 0; 
+            padding-left: 0; 
+            padding-right: 0; 
+            border-right-color: transparent; 
+            opacity: 0;
+            pointer-events: none;
+        }
+
         .user-info { font-size: 13px; color: #94a3b8; padding: 8px; background: #0f172a; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
         .logout-btn { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 12px; font-weight: bold; }
-        .new-btn { background: #6366f1; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; }
+        .new-btn { background: #6366f1; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; text-align: left; }
         .new-btn:hover { background: #4f46e5; }
         .chat-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
         .chat-item { padding: 10px 12px; background: #334155; border-radius: 6px; cursor: pointer; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .chat-item:hover { background: #475569; }
 
-        .main { flex: 1; display: flex; flex-direction: column; }
-        .header { padding: 16px 20px; background: #0f172a; border-bottom: 1px solid #334155; font-weight: bold; font-size: 18px; color: #818cf8; }
+        /* Главная область */
+        .main { flex: 1; display: flex; flex-direction: column; width: 100%; }
+        
+        /* Шапка с кнопкой меню */
+        .header { 
+            padding: 12px 20px; 
+            background: #0f172a; 
+            border-bottom: 1px solid #334155; 
+            display: flex; 
+            align-items: center; 
+            gap: 15px; 
+        }
+        
+        .toggle-btn { 
+            background: transparent; 
+            border: none; 
+            color: #94a3b8; 
+            font-size: 20px; 
+            cursor: pointer; 
+            padding: 6px 10px; 
+            border-radius: 8px; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.2s;
+        }
+        .toggle-btn:hover { background: #1e293b; color: white; }
+
+        .header-title { font-weight: bold; font-size: 18px; color: #818cf8; }
+
         .messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
         .msg { max-width: 75%; padding: 12px 16px; border-radius: 12px; font-size: 15px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
         .msg img { max-width: 100%; max-height: 300px; border-radius: 8px; margin-top: 8px; display: block; }
@@ -67,7 +118,7 @@
     </div>
 
     <!-- Главный интерфейс -->
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
         <div class="user-info">
             <span id="userEmailDisplay">user@mail.com</span>
             <button class="logout-btn" onclick="logout()">Выход</button>
@@ -77,7 +128,10 @@
     </div>
 
     <div class="main">
-        <div class="header">Dzhamal AI ⚡</div>
+        <div class="header">
+            <button class="toggle-btn" onclick="toggleSidebar()" title="Свернуть/Развернуть меню">☰</button>
+            <div class="header-title">Dzhamal AI ⚡</div>
+        </div>
         <div class="messages" id="messages"></div>
         
         <div class="input-container">
@@ -104,6 +158,12 @@
 
         let chats = [];
         let currentChatId = null;
+
+        // --- ПЕРЕКЛЮЧЕНИЕ СИДЕБАРА ---
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('collapsed');
+        }
 
         // --- АВТОРИЗАЦИЯ ---
         window.onload = () => {
